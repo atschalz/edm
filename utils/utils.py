@@ -186,7 +186,8 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
     elif target == "binary":
         xgb_model = xgb.XGBClassifier
         xgb_metric = "auc"
-        eval_metric = lambda y_true, y_pred: -auroc(y_true, y_pred)
+        # eval_metric = lambda y_true, y_pred: -auroc(y_true, y_pred)
+        eval_metric = log_loss
         xgb_objective = "binary:logistic"
 
     elif target == "categorical":
@@ -571,8 +572,12 @@ def evaluate_xgb(X_train, y_train, X_test, y_test, target, tune=False, max_evals
     else:
         y_train_pred = xgb_model.predict_proba(X_train)
         y_test_pred = xgb_model.predict_proba(X_test)
-        eval_res_train = get_metrics(get_one_hot(y_train,nb_classes), y_train_pred, target=target)
-        eval_res_test = get_metrics(get_one_hot(y_test,nb_classes), y_test_pred, target=target)
+        if target == "binary":
+            eval_res_train = get_metrics(y_train, y_train_pred[:,1], target=target)
+            eval_res_test = get_metrics(y_test, y_test_pred[:,1], target=target)
+        else:
+            eval_res_train = get_metrics(get_one_hot(y_train, nb_classes), y_train_pred, target=target)
+            eval_res_test = get_metrics(get_one_hot(y_test, nb_classes), y_test_pred, target=target)
 
     for metric in eval_res_train.keys():
         results[metric + " Train"] = eval_res_train[metric]
@@ -691,13 +696,17 @@ def evaluate_logreg(X_train, y_train, X_test, y_test, target, tune=False, max_ev
                                        )
     lr.fit(X_train.values, y_train)
 
-    y_train_pred_lr = lr.predict_proba(X_train.values)
-    y_test_pred_lr = lr.predict_proba(X_test.values)
+    y_train_pred_lr = lr.predict_proba(X_train.values)[:,1]
+    y_test_pred_lr = lr.predict_proba(X_test.values)[:,1]
 
-    eval_res_train = get_metrics(get_one_hot(y_train,nb_classes), y_train_pred_lr, target=target)
+    if target == "binary":
+        eval_res_train = get_metrics(y_train, y_train_pred_lr, target=target)
+        eval_res_test = get_metrics(y_test, y_test_pred_lr, target=target)
+    else:
+        eval_res_train = get_metrics(get_one_hot(y_train, nb_classes), y_train_pred_lr, target=target)
+        eval_res_test = get_metrics(get_one_hot(y_test, nb_classes), y_test_pred_lr, target=target)
     for metric in eval_res_train.keys():
         results[metric + " Train"] = eval_res_train[metric]
-    eval_res_test = get_metrics(get_one_hot(y_test,nb_classes), y_test_pred_lr, target=target)
     for metric in eval_res_test.keys():
         results[metric + " Test"] = eval_res_test[metric]
 
@@ -777,27 +786,53 @@ def tune_logreg_multiclass(X, y, max_evals=20, seed=0):
     return final_hyperparameters
 
 
-def tune_logreg_binary(X_train, y_train, X_val, y_val, target, max_evals=50, seed=0):
+def tune_logreg_binary(X, y, target, max_evals=50, seed=0):
     '''Algorithm to tune C for Logistic Regression'''
 
+    kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
+    split = kf.split(X, y)
+    X_train_list = []
+    y_train_list = []
+    X_val_list = []
+    y_val_list = []
+    for num, (train_indices, test_indices) in enumerate(split):
+        X_train_list.append(X.iloc[train_indices])
+        y_train_list.append(y[train_indices])
+        X_val_list.append(X.iloc[test_indices])
+        y_val_list.append(y[test_indices])
+
+
     space = {
-        'C': hp.uniform("C", 1e-10,1.0),
+        'C': hp.uniform("C", 1e-10, 1.0),
         'seed': seed
     }
 
     def objective(space):
-        model = LogisticRegression(penalty="l1",
-                                   C=space["alpha"],
-                                   random_state = space['seed'])
+        score_list = []
+        for i in range(5):
+            X_train = X_train_list[i]
+            y_train = y_train_list[i]
+            X_val = X_val_list[i]
+            y_val = y_val_list[i]
 
-        evaluation = [(X_train, y_train), (X_val, y_val)]
+            model = LogisticRegression(penalty="l2",
+                                       solver="lbfgs",
+                                       C=space["C"],
+                                       max_iter=10000,
+                                       random_state=space['seed']
+                                       )
 
-        model.fit(X_train, y_train)
+            model.fit(X_train.values, y_train)
 
-        pred = model.predict(X_val)
-        score = -auroc(y_val, pred)
+            # if target=="continuous":
+            pred = model.predict_proba(X_val.values)
+            # else:
+            #     pred = model.predict_proba(X_val)
+            score_list.append(log_loss(y_val, pred))
+        score = np.mean(score_list)
         print(f"SCORE: {score}")
         return {'loss': score, 'status': STATUS_OK}
+
 
     trials = Trials()
 

@@ -98,49 +98,62 @@ def process_dataset(dataset_name, target="", mode="train_val_test", RS=42, hct=1
         # 5. Rest is numeric
         numeric_cols = list(set(df.columns[df.dtypes != "object"]) - set([y_col]) - set(bin_cols))
     elif dataset_name == "OULAD":
-        assessments_df = pd.read_csv(f'../data/raw/{dataset_name}/assessments.csv')
-        courses_df = pd.read_csv(f'../data/raw/{dataset_name}/courses.csv')
-        studentAssessment_df = pd.read_csv(f'../data/raw/{dataset_name}/studentAssessment.csv')
-        studentInfo_df = pd.read_csv(f'../data/raw/{dataset_name}/studentInfo.csv')
-        studentRegistration_df = pd.read_csv(f'../data/raw/{dataset_name}/studentRegistration.csv')
-        studentVle_df = pd.read_csv(f'../data/raw/{dataset_name}/studentVle.csv')
-        vle_df = pd.read_csv(f'../data/raw/{dataset_name}/vle.csv')
+        #########  Preprocessing #################################
+        if not os.path.exists(f"../data/prepared/{dataset_name}/df_prepared.pickle"):
 
-        # Remove all withdrawn
-        studentInfo_df = studentInfo_df.loc[studentInfo_df.final_result != "Withdrawn"]
-        studentInfo_df.shape
+            assessments_df = pd.read_csv(f'../data/raw/{dataset_name}/assessments.csv')
+            courses_df = pd.read_csv(f'../data/raw/{dataset_name}/courses.csv')
+            studentAssessment_df = pd.read_csv(f'../data/raw/{dataset_name}/studentAssessment.csv')
+            studentInfo_df = pd.read_csv(f'../data/raw/{dataset_name}/studentInfo.csv')
+            studentRegistration_df = pd.read_csv(f'../data/raw/{dataset_name}/studentRegistration.csv')
+            studentVle_df = pd.read_csv(f'../data/raw/{dataset_name}/studentVle.csv')
+            vle_df = pd.read_csv(f'../data/raw/{dataset_name}/vle.csv')
 
-        # Assessment performance features
-        merged_assessments_df = pd.merge(studentAssessment_df, assessments_df, on="id_assessment")
-        avg_tma = [merged_assessments_df.loc[np.logical_and(merged_assessments_df.id_student == i,
-                                                            merged_assessments_df.assessment_type == "TMA"), "score"].mean()
-                   for i in studentInfo_df.id_student.values]
-        avg_cma = [merged_assessments_df.loc[np.logical_and(merged_assessments_df.id_student == i,
-                                                            merged_assessments_df.assessment_type == "CMA"), "score"].mean()
-                   for i in studentInfo_df.id_student.values]
-        avg_exam = [merged_assessments_df.loc[np.logical_and(merged_assessments_df.id_student == i,
-                                                             merged_assessments_df.assessment_type == "Exam"), "score"].mean()
-                    for i in studentInfo_df.id_student.values]
+            # Remove all withdrawn
+            studentInfo_df = studentInfo_df.loc[studentInfo_df.final_result != "Withdrawn"]
+            studentInfo_df.shape
 
-        studentInfo_df["avg_tma"] = avg_tma
-        studentInfo_df["avg_cma"] = avg_cma
-        studentInfo_df["avg_exam"] = avg_exam
+            # Assessment performance features
+            merged_assessments_df = pd.merge(studentAssessment_df, assessments_df, on="id_assessment")
 
-        # Get VLE features
-        vle_merged = pd.merge(studentVle_df, vle_df, on=["code_module", "code_presentation", "id_site"])
-        for activity_type in vle_df.activity_type.unique():
-            agg = vle_merged.loc[vle_merged.activity_type == activity_type].groupby("id_student")
-            count_click_dict = dict(agg.count()["sum_click"])
-            sum_click_dict = dict(agg.sum()["sum_click"])
-            studentInfo_df[f"Count_Visits_{activity_type}"] = studentInfo_df["id_student"].apply(
-                lambda x: sum_click_dict[x] if x in count_click_dict.keys() else 0)
-            studentInfo_df[f"Sum_Clicks_{activity_type}"] = studentInfo_df["id_student"].apply(
-                lambda x: sum_click_dict[x] if x in sum_click_dict.keys() else 0)
+            avg_tma = [merged_assessments_df.loc[np.logical_and(merged_assessments_df.id_student == i,
+                                                                merged_assessments_df.assessment_type == "TMA"), "score"].mean()
+                       for i in studentInfo_df.id_student.values]
+            avg_cma = [merged_assessments_df.loc[np.logical_and(merged_assessments_df.id_student == i,
+                                                                merged_assessments_df.assessment_type == "CMA"), "score"].mean()
+                       for i in studentInfo_df.id_student.values]
+            avg_exam = [merged_assessments_df.loc[np.logical_and(merged_assessments_df.id_student == i,
+                                                                 merged_assessments_df.assessment_type == "Exam"), "score"].mean()
+                        for i in studentInfo_df.id_student.values]
+
+            studentInfo_df["avg_tma"] = avg_tma
+            studentInfo_df["avg_cma"] = avg_cma
+            studentInfo_df["avg_exam"] = avg_exam
+
+            # Get VLE features
+            vle_merged = pd.merge(studentVle_df, vle_df, on=["code_module", "code_presentation", "id_site"])
+            for activity_type in vle_df.activity_type.unique():
+                agg = vle_merged.loc[vle_merged.activity_type == activity_type].groupby("id_student")
+                count_click_dict = dict(agg.count()["sum_click"])
+                sum_click_dict = dict(agg.sum()["sum_click"])
+                studentInfo_df[f"Count_Visits_{activity_type}"] = studentInfo_df["id_student"].apply(
+                    lambda x: sum_click_dict[x] if x in count_click_dict.keys() else 0)
+                studentInfo_df[f"Sum_Clicks_{activity_type}"] = studentInfo_df["id_student"].apply(
+                    lambda x: sum_click_dict[x] if x in sum_click_dict.keys() else 0)
+
+            with open(f"../data/prepared/{dataset_name}/df_prepared.pickle", 'wb') as handle:
+                pickle.dump(studentInfo_df, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+        else:
+            with open(f"../data/prepared/{dataset_name}/df_prepared.pickle", 'rb') as handle:
+                studentInfo_df = pickle.load(handle)
 
         df = studentInfo_df.copy()
         df = df.drop(["id_student", "code_module", "code_presentation", "avg_exam"], axis=1)
 
         df["final_result"] = df["final_result"].apply(lambda x: 0 if x == "Fail" else 1)
+
+        df.index = list(range(df.shape[0]))
 
         # 1. Identify target
         y_col = "final_result"
