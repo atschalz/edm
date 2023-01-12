@@ -93,9 +93,8 @@ def process_dataset(dataset_name, target="", mode="train_val_test", RS=42, hct=1
         # 2. Identify binary columns = zwei Ausprägungen
         bin_cols = list(set(df.nunique()[df.nunique() == 2].index) - set([y_col]))
         # 3. Identify high cardinality = dytpes==object & >hct Ausprägunge
-        z_cols = list(df.nunique()[np.logical_and(df.nunique() >= hct, df.dtypes == "object")].index)
-        # 4. Identify cat cols = Rest dytpes==object
-        cat_cols = list(set(df.dtypes[df.dtypes == "object"].index) - set([y_col] + bin_cols + z_cols))
+        z_cols = list(set(df.columns[np.logical_and(df.dtypes == "object", df.nunique()>2)]) - set([y_col]))
+        cat_cols = []
         # 5. Rest is numeric
         numeric_cols = list(set(df.columns[df.dtypes != "object"]) - set([y_col]) - set(bin_cols))
     elif dataset_name == "OULAD":
@@ -148,9 +147,8 @@ def process_dataset(dataset_name, target="", mode="train_val_test", RS=42, hct=1
         # 2. Identify binary columns = zwei Ausprägungen
         bin_cols = list(set(df.nunique()[df.nunique() == 2].index) - set([y_col]))
         # 3. Identify high cardinality = dytpes==object & >hct Ausprägunge
-        z_cols = list(df.nunique()[np.logical_and(df.nunique() >= hct, df.dtypes == "object")].index)
-        # 4. Identify cat cols = Rest dytpes==object
-        cat_cols = list(set(df.dtypes[df.dtypes == "object"].index) - set([y_col] + bin_cols + z_cols))
+        z_cols = list(set(df.columns[np.logical_and(df.dtypes == "object", df.nunique()>2)]) - set([y_col]))
+        cat_cols = []
         # 5. Rest is numeric
         numeric_cols = list(set(df.columns[df.dtypes != "object"]) - set([y_col]) - set(bin_cols))
 

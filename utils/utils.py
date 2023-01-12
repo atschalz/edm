@@ -3,8 +3,9 @@ import numpy as np
 import pandas as pd
 import gpboost as gpb
 from utils.evaluation import get_metrics
+from sklearn.metrics import log_loss
 
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, StratifiedKFold
 from hyperopt import STATUS_OK, Trials, fmin, hp, tpe
 from sklearn.metrics import mean_squared_error as mse
 from sklearn.metrics import roc_auc_score as auroc
@@ -181,27 +182,39 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
         xgb_model = xgb.XGBRegressor
         xgb_metric = "rmse"
         eval_metric = mse
-    elif target in "binary":
+        xgb_objective = "reg:squarederror"
+    elif target == "binary":
         xgb_model = xgb.XGBClassifier
         xgb_metric = "auc"
         eval_metric = lambda y_true, y_pred: -auroc(y_true, y_pred)
+        xgb_objective = "binary:logistic"
 
-    elif target in "categorical":
+    elif target == "categorical":
         xgb_model = xgb.XGBClassifier
         xgb_metric = "auc"
         # eval_metric = lambda y_true, y_pred: -auroc(y_true, y_pred, multi_class="ovo", average="macro")
-        eval_metric = lambda y_true, y_pred: -f1(y_true, y_pred, average="macro")
+        # eval_metric = lambda y_true, y_pred: -f1(y_true, y_pred, average="macro")
+        eval_metric = log_loss
+        xgb_objective = "multi:softproba"
 
     model = xgb_model(
+        objective = xgb_objective,
         # eval_metric=xgb_metric,
         # early_stopping_rounds=early_stopping_rounds,
         seed=seed)
     model.fit(X, y,
               verbose=False)
-    test_pred = model.predict(X_test)
+    if target=="continuous":
+        test_pred = model.predict(X_test)
+    else:
+        test_pred = model.predict_proba(X_test)
     print(f"Default performance on Test: {eval_metric(y_test, test_pred)}")
 
-    kf = KFold(n_splits=5, shuffle=True, random_state=seed)
+    if target == "continuous":
+        kf = KFold(n_splits=5, shuffle=True, random_state=seed)
+    else:
+        kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
+
     split = kf.split(X, y)
     X_train_list = []
     y_train_list = []
@@ -229,6 +242,7 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
             y_val = y_val_list[i]
 
             model = xgb_model(
+                objective=xgb_objective,
                 eval_metric=xgb_metric,
                 early_stopping_rounds=early_stopping_rounds,
                 n_estimators=space['n_estimators'],
@@ -242,10 +256,10 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
                       eval_set=evaluation,
                       verbose=False)
 
-            # if target=="continuous":
-            pred = model.predict(X_val)
-            # else:
-            #     pred = model.predict_proba(X_val)
+            if target=="continuous":
+                pred = model.predict(X_val)
+            else:
+                pred = model.predict_proba(X_val)
             score_list.append(eval_metric(y_val, pred))
         score = np.mean(score_list)
         print(f"SCORE: {score}")
@@ -269,10 +283,11 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
     # 2. Tune max_depth and min_child_weight
     space = final_hyperparameters
     space['seed'] = 0
-    space['max_depth'] = hp.quniform("max_depth", 3, 18, 1)
+    space['max_depth'] = hp.quniform("max_depth", 1, 18, 1)
     space['min_child_weight'] = hp.quniform('min_child_weight', 0, 10, 1)
 
     model = xgb_model(
+        objective = xgb_objective,
         # eval_metric=xgb_metric,
         # early_stopping_rounds=early_stopping_rounds,
         n_estimators=int(space['n_estimators']),
@@ -280,7 +295,10 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
         seed=seed)
     model.fit(X, y,
               verbose=False)
-    test_pred = model.predict(X_test)
+    if target=="continuous":
+        test_pred = model.predict(X_test)
+    else:
+        test_pred = model.predict_proba(X_test)
     print(f"Test Performance after first tuning round: {eval_metric(y_test, test_pred)}")
 
 
@@ -293,6 +311,7 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
             y_val = y_val_list[i]
 
             model = xgb_model(
+                objective=xgb_objective,
                 eval_metric=xgb_metric,
                 early_stopping_rounds=early_stopping_rounds,
                 n_estimators=int(space['n_estimators']),
@@ -308,10 +327,10 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
                       eval_set=evaluation,
                       verbose=False)
 
-            # if target=="continuous":
-            pred = model.predict(X_val)
-            # else:
-            #     pred = model.predict_proba(X_val)
+            if target=="continuous":
+                pred = model.predict(X_val)
+            else:
+                pred = model.predict_proba(X_val)
             score_list.append(eval_metric(y_val, pred))
         score = np.mean(score_list)
         print(f"SCORE: {score}")
@@ -338,6 +357,7 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
     space['subsample'] = hp.uniform('subsample', 0.5, 1)
 
     model = xgb_model(
+        objective = xgb_objective,
         # eval_metric=xgb_metric,
         # early_stopping_rounds=early_stopping_rounds,
         n_estimators=int(space['n_estimators']),
@@ -347,7 +367,10 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
         seed=seed)
     model.fit(X, y,
               verbose=False)
-    test_pred = model.predict(X_test)
+    if target=="continuous":
+        test_pred = model.predict(X_test)
+    else:
+        test_pred = model.predict_proba(X_test)
     print(f"Test Performance after second tuning round: {eval_metric(y_test, test_pred)}")
 
     def objective(space):
@@ -359,6 +382,7 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
             y_val = y_val_list[i]
 
             model = xgb_model(
+                objective=xgb_objective,
                 eval_metric=xgb_metric,
                 early_stopping_rounds=early_stopping_rounds,
                 n_estimators=int(space['n_estimators']),
@@ -376,10 +400,10 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
                       eval_set=evaluation,
                       verbose=False)
 
-            # if target=="continuous":
-            pred = model.predict(X_val)
-            # else:
-            #     pred = model.predict_proba(X_val)
+            if target=="continuous":
+                pred = model.predict(X_val)
+            else:
+                pred = model.predict_proba(X_val)
             score_list.append(eval_metric(y_val, pred))
         score = np.mean(score_list)
         print(f"SCORE: {score}")
@@ -402,11 +426,12 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
     # 4. Tune alpha,lambda & gamma
     space = final_hyperparameters
     space['seed'] = 0
-    space['gamma'] = hp.uniform('gamma', 0, 9)
-    space['reg_alpha'] = hp.quniform('reg_alpha', 0, 180, 1)
-    space['reg_lambda'] = hp.uniform('reg_lambda', 0, 1)
+    space['gamma'] = hp.uniform('gamma', 1e-8, 9)
+    space['reg_alpha'] = hp.quniform('reg_alpha', 1e-8, 10, 1)
+    space['reg_lambda'] = hp.uniform('reg_lambda', 1, 4)
 
     model = xgb_model(
+        objective = xgb_objective,
         # eval_metric=xgb_metric,
         # early_stopping_rounds=early_stopping_rounds,
         n_estimators=int(space['n_estimators']),
@@ -418,7 +443,10 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
         seed=seed)
     model.fit(X, y,
               verbose=False)
-    test_pred = model.predict(X_test)
+    if target=="continuous":
+        test_pred = model.predict(X_test)
+    else:
+        test_pred = model.predict_proba(X_test)
     print(f"Test Performance after third tuning round: {eval_metric(y_test, test_pred)}")
 
 
@@ -431,6 +459,7 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
             y_val = y_val_list[i]
 
             model = xgb_model(
+                objective=xgb_objective,
                 eval_metric=xgb_metric,
                 early_stopping_rounds=early_stopping_rounds,
                 n_estimators=int(space['n_estimators']),
@@ -451,10 +480,10 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
                       eval_set=evaluation,
                       verbose=False)
 
-            # if target=="continuous":
-            pred = model.predict(X_val)
-            # else:
-            #     pred = model.predict_proba(X_val)
+            if target=="continuous":
+                pred = model.predict(X_val)
+            else:
+                pred = model.predict_proba(X_val)
             score_list.append(eval_metric(y_val, pred))
         score = np.mean(score_list)
         print(f"SCORE: {score}")
@@ -476,6 +505,7 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
     print(final_hyperparameters)
 
     model = xgb_model(
+        objective = xgb_objective,
         # eval_metric=xgb_metric,
         # early_stopping_rounds=early_stopping_rounds,
         n_estimators=int(final_hyperparameters['n_estimators']),
@@ -490,9 +520,11 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
         seed=seed)
     model.fit(X, y,
               verbose=False)
-    test_pred = model.predict(X_test)
+    if target=="continuous":
+        test_pred = model.predict(X_test)
+    else:
+        test_pred = model.predict_proba(X_test)
     print(f"Test Performance after last tuning round: {eval_metric(y_test, test_pred)}")
-
 
     return final_hyperparameters
 
@@ -500,14 +532,20 @@ def evaluate_xgb(X_train, y_train, X_test, y_test, target, tune=False, max_evals
     results = {}
     if target =="continuous":
         xgb_model_type = xgb.XGBRegressor
-    else:
+        xgb_objective = "reg:squarederror"
+    elif target =="binary":
+        xgb_model_type = xgb.XGBClassifier
+        xgb_objective = "binary:logistic"
+    elif target =="categorical":
         xgb_model_type = xgb.XGBClassifier
         nb_classes = np.unique(y_train).shape[0]
+        xgb_objective = "multi:softproba"
 
 
     if tune:
         final_hyperparameters = tune_xgboost(X_train, y_train, X_test, y_test, target, max_evals=max_evals,early_stopping_rounds=early_stopping_rounds,seed=0)
         xgb_model = xgb_model_type(
+            objective = xgb_objective,
             # eval_metric=xgb_metric,
             # early_stopping_rounds=early_stopping_rounds,
             n_estimators=int(final_hyperparameters['n_estimators']),
@@ -641,12 +679,14 @@ def evaluate_logreg(X_train, y_train, X_test, y_test, target, tune=False, max_ev
         lr = LogisticRegression(penalty="l2",
                                        solver="lbfgs",
                                        C=final_hyperparameters["C"],
+                                       max_iter=10000,
                                        random_state=seed
                                        )
 
     else:
         lr = LogisticRegression(penalty="l2",
                                        solver="lbfgs",
+                                       max_iter=10000,
                                        random_state=seed
                                        )
     lr.fit(X_train.values, y_train)
@@ -661,7 +701,7 @@ def evaluate_logreg(X_train, y_train, X_test, y_test, target, tune=False, max_ev
     for metric in eval_res_test.keys():
         results[metric + " Test"] = eval_res_test[metric]
 
-    lr_feat = pd.DataFrame([lr.coef_], columns=X_train.columns).transpose()
+    lr_feat = pd.DataFrame(lr.coef_, columns=X_train.columns).transpose()
 
     return results, lr_feat
 
@@ -676,7 +716,7 @@ def tune_logreg_multiclass(X, y, max_evals=20, seed=0):
 
     n_classes = np.unique(y).shape[0]
 
-    kf = KFold(n_splits=5, shuffle=True, random_state=seed)
+    kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
     split = kf.split(X, y)
     X_train_list = []
     y_train_list = []
@@ -705,16 +745,17 @@ def tune_logreg_multiclass(X, y, max_evals=20, seed=0):
             model = LogisticRegression(penalty="l2",
                                        solver="lbfgs",
                                        C=space["C"],
+                                       max_iter=10000,
                                        random_state=space['seed']
                                        )
 
             model.fit(X_train.values, y_train)
 
             # if target=="continuous":
-            pred = model.predict(X_val.values)
+            pred = model.predict_proba(X_val.values)
             # else:
             #     pred = model.predict_proba(X_val)
-            score_list.append(-f1(y_val, pred, average="macro"))
+            score_list.append(log_loss(y_val, pred))
         score = np.mean(score_list)
         print(f"SCORE: {score}")
         return {'loss': score, 'status': STATUS_OK}
