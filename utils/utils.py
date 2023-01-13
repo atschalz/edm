@@ -696,12 +696,12 @@ def evaluate_logreg(X_train, y_train, X_test, y_test, target, tune=False, max_ev
                                        )
     lr.fit(X_train.values, y_train)
 
-    y_train_pred_lr = lr.predict_proba(X_train.values)[:,1]
-    y_test_pred_lr = lr.predict_proba(X_test.values)[:,1]
+    y_train_pred_lr = lr.predict_proba(X_train.values)
+    y_test_pred_lr = lr.predict_proba(X_test.values)
 
     if target == "binary":
-        eval_res_train = get_metrics(y_train, y_train_pred_lr, target=target)
-        eval_res_test = get_metrics(y_test, y_test_pred_lr, target=target)
+        eval_res_train = get_metrics(y_train, y_train_pred_lr[:,1], target=target)
+        eval_res_test = get_metrics(y_test, y_test_pred_lr[:,1], target=target)
     else:
         eval_res_train = get_metrics(get_one_hot(y_train, nb_classes), y_train_pred_lr, target=target)
         eval_res_test = get_metrics(get_one_hot(y_test, nb_classes), y_test_pred_lr, target=target)
