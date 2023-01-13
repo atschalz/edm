@@ -532,7 +532,7 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
 
     return final_hyperparameters
 
-def evaluate_xgb(X_train, y_train, X_test, y_test, target, tune=False, max_evals=20, early_stopping_rounds=10, seed=0):
+def evaluate_xgb(X_train, y_train, X_test, y_test, target, tune=False, max_evals=20, early_stopping_rounds=10, seed=0, target_scaler=None):
     results = {}
     if target =="continuous":
         xgb_model_type = xgb.XGBRegressor
@@ -573,8 +573,14 @@ def evaluate_xgb(X_train, y_train, X_test, y_test, target, tune=False, max_evals
     if target == "continuous":
         y_train_pred = xgb_model.predict(X_train)
         y_test_pred = xgb_model.predict(X_test)
-        eval_res_train = get_metrics(y_train, y_train_pred, target=target)
-        eval_res_test = get_metrics(y_test, y_test_pred, target=target)
+
+        y_train_rescaled = target_scaler.inverse_transform(y_train.reshape(-1,1)).ravel()
+        y_train_pred_rescaled = target_scaler.inverse_transform(y_train_pred.reshape(-1,1)).ravel()
+        y_test_rescaled= target_scaler.inverse_transform(y_test.reshape(-1,1)).ravel()
+        y_test_pred_rescaled = target_scaler.inverse_transform(y_test_pred.reshape(-1,1)).ravel()
+
+        eval_res_train = get_metrics(y_train_rescaled, y_train_pred_rescaled, target=target)
+        eval_res_test = get_metrics(y_test_rescaled, y_test_pred_rescaled, target=target)
     else:
         y_train_pred = xgb_model.predict_proba(X_train)
         y_test_pred = xgb_model.predict_proba(X_test)
@@ -655,7 +661,7 @@ def tune_lasso(X, y, max_evals=20, seed=0):
     return final_hyperparameters
 
 
-def evaluate_lr(X_train, y_train, X_test, y_test, target, tune=False, max_evals=20, seed=0):
+def evaluate_lr(X_train, y_train, X_test, y_test, target, tune=False, max_evals=20, seed=0, target_scaler=None):
     results = {}
 
     if tune:
@@ -667,13 +673,21 @@ def evaluate_lr(X_train, y_train, X_test, y_test, target, tune=False, max_evals=
         lr = Lasso(random_state=seed, alpha=0.001)
     lr.fit(X_train, y_train)
 
-    y_train_pred_lr = lr.predict(X_train)
-    y_test_pred_lr = lr.predict(X_test)
+    y_train_pred = lr.predict(X_train)
+    y_test_pred = lr.predict(X_test)
 
-    eval_res_train = get_metrics(y_train, y_train_pred_lr, target=target)
+    y_train_rescaled = target_scaler.inverse_transform(y_train.reshape(-1, 1)).ravel()
+    y_train_pred_rescaled = target_scaler.inverse_transform(y_train_pred.reshape(-1, 1)).ravel()
+    y_test_rescaled = target_scaler.inverse_transform(y_test.reshape(-1, 1)).ravel()
+    y_test_pred_rescaled = target_scaler.inverse_transform(y_test_pred.reshape(-1, 1)).ravel()
+
+    eval_res_train = get_metrics(y_train_rescaled, y_train_pred_rescaled, target=target)
+    eval_res_test = get_metrics(y_test_rescaled, y_test_pred_rescaled, target=target)
+
+    eval_res_train = get_metrics(y_train_rescaled, y_train_pred_rescaled, target=target)
     for metric in eval_res_train.keys():
         results[metric + " Train"] = eval_res_train[metric]
-    eval_res_test = get_metrics(y_test, y_test_pred_lr, target=target)
+    eval_res_test = get_metrics(y_test_rescaled, y_test_pred_rescaled, target=target)
     for metric in eval_res_test.keys():
         results[metric + " Test"] = eval_res_test[metric]
 

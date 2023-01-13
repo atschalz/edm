@@ -267,7 +267,7 @@ def process_dataset(dataset_name, target="", mode="train_val_test", RS=42, hct=1
                 y_val = pd.Series(target_scaler.transform(y_val.values.reshape(-1, 1)).ravel(),index=X_val.index)
             y_test = pd.Series(target_scaler.transform(y_test.values.reshape(-1, 1)).ravel(),index=X_test.index)
 
-            return_dict["target_scaler"] = target_scaler
+            return_dict[f"target_scaler_{num}"] = target_scaler
 
         ### Encoding & Imputation 2
         # get encodings for high-card cat features
