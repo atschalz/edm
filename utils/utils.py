@@ -4,6 +4,7 @@ import pandas as pd
 import gpboost as gpb
 from utils.evaluation import get_metrics
 from sklearn.metrics import log_loss
+from tensorflow_addons.metrics import F1Score
 
 from sklearn.model_selection import KFold, StratifiedKFold
 from hyperopt import STATUS_OK, Trials, fmin, hp, tpe
@@ -191,11 +192,13 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
         xgb_objective = "binary:logistic"
 
     elif target == "categorical":
+        nb_classes = np.unique(y).shape[0]
         xgb_model = xgb.XGBClassifier
         xgb_metric = "auc"
         # eval_metric = lambda y_true, y_pred: -auroc(y_true, y_pred, multi_class="ovo", average="macro")
         # eval_metric = lambda y_true, y_pred: -f1(y_true, y_pred, average="macro")
-        eval_metric = log_loss
+        eval_metric = lambda y_true, y_pred: -F1Score(num_classes=nb_classes, average="macro")(get_one_hot(y_true, nb_classes), y_pred).numpy()
+        # eval_metric = log_loss
         xgb_objective = "multi:softproba"
 
     model = xgb_model(
@@ -561,7 +564,10 @@ def evaluate_xgb(X_train, y_train, X_test, y_test, target, tune=False, max_evals
             seed=seed)
 
     else:
-        xgb_model = xgb_model_type(seed=seed)
+        xgb_model = xgb_model_type(
+            objective = xgb_objective,
+            seed=seed)
+
     xgb_model.fit(X_train, y_train)
 
     if target == "continuous":
