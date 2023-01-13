@@ -544,7 +544,7 @@ def evaluate_xgb(X_train, y_train, X_test, y_test, target, tune=False, max_evals
 
 
     if tune:
-        final_hyperparameters = tune_xgboost(X_train, y_train, X_test, y_test, target, max_evals=max_evals,early_stopping_rounds=early_stopping_rounds,seed=0)
+        final_hyperparameters = tune_xgboost(X_train, y_train, X_test, y_test, target, max_evals=max_evals,early_stopping_rounds=early_stopping_rounds,seed=seed)
         xgb_model = xgb_model_type(
             objective = xgb_objective,
             # eval_metric=xgb_metric,
