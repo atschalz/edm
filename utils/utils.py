@@ -283,7 +283,7 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
 
     # 2. Tune max_depth and min_child_weight
     space = final_hyperparameters
-    space['seed'] = 0
+    space['seed'] = seed
     space['max_depth'] = hp.quniform("max_depth", 1, 18, 1)
     space['min_child_weight'] = hp.quniform('min_child_weight', 0, 10, 1)
 
@@ -353,7 +353,7 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
 
     # 3. Tune colsample_bytree and sampling
     space = final_hyperparameters
-    space['seed'] = 0
+    space['seed'] = seed
     space['colsample_bytree'] = hp.uniform('colsample_bytree', 0.5, 1)
     space['subsample'] = hp.uniform('subsample', 0.5, 1)
 
@@ -426,7 +426,7 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
 
     # 4. Tune alpha,lambda & gamma
     space = final_hyperparameters
-    space['seed'] = 0
+    space['seed'] = seed
     space['gamma'] = hp.uniform('gamma', 1e-8, 9)
     space['reg_alpha'] = hp.quniform('reg_alpha', 1e-8, 10, 1)
     space['reg_lambda'] = hp.uniform('reg_lambda', 1, 4)
