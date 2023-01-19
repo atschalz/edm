@@ -323,7 +323,7 @@ def process_dataset(dataset_name, target="", mode="train_val_test", RS=42, hct=1
                     z_target_encoded_val = z_target_encoded_val.join(re_encoded_val)
                 z_target_encoded_test = z_target_encoded_test.join(re_encoded_test)
 
-                # Target encoding
+                # Ordinal encoding
                 encoder = ce.OrdinalEncoder()
                 re_encoded_train = encoder.fit_transform(X_train[col].astype(object), y_train)
                 if mode in ["train_val_test", "cv"]:
@@ -334,7 +334,7 @@ def process_dataset(dataset_name, target="", mode="train_val_test", RS=42, hct=1
                     z_ordinal_encoded_val = z_ordinal_encoded_val.join(re_encoded_val)
                 z_ordinal_encoded_test = z_ordinal_encoded_test.join(re_encoded_test)
 
-                # Target encoding
+                # CatBoost encoding
                 encoder = ce.CatBoostEncoder()
                 re_encoded_train = encoder.fit_transform(X_train[col].astype(object), y_train)
                 if mode in ["train_val_test", "cv"]:
