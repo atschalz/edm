@@ -167,8 +167,8 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
         colsample_bytree = Uniform in [0.5,1], float, (default=1)
         subsample = Uniform in [0.5,1], float, (default=1)
         gamma: Uniform in [10^{-8},9], float, (default = 0)
-        reg_alpha = Q-uniform in [10^{-8},100], int, (default = 0)
-        reg_lambda = Uniform in [10^{-8},1], float, (default = 1)
+        reg_alpha = Q-uniform in [10^{-8},10], int, (default = 0)
+        reg_lambda = Uniform in [10^{-8},4], float, (default = 1)
 
     space['max_depth'] = hp.quniform("max_depth", 3, 18, 1)
     space['min_child_weight'] = hp.quniform('min_child_weight', 0, 10, 1)
@@ -431,8 +431,8 @@ def tune_xgboost(X, y, X_test, y_test, target, max_evals=50, early_stopping_roun
     space = final_hyperparameters
     space['seed'] = seed
     space['gamma'] = hp.uniform('gamma', 1e-8, 9)
-    space['reg_alpha'] = hp.quniform('reg_alpha', 1e-8, 100, 1)
-    space['reg_lambda'] = hp.uniform('reg_lambda', 1e-8, 1)
+    space['reg_alpha'] = hp.quniform('reg_alpha', 1e-8, 10, 1)
+    space['reg_lambda'] = hp.uniform('reg_lambda', 1e-8, 4)
 
     model = xgb_model(
         objective = xgb_objective,
