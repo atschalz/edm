@@ -180,7 +180,6 @@ def process_dataset(dataset_name, target="", mode="train_val_test", RS=42, hct=1
 
     assert len(cat_cols+[y_col]+z_cols+bin_cols+numeric_cols)==df.shape[1], "Column type definitions imply different dimensionality than dataset"
 
-    # Drop columns with more than 5% missings (difference to Pargent et al.)
     df = df.drop(df.columns[df.isna().sum() / df.shape[0] > 0.95], axis=1)
 
 
@@ -219,7 +218,6 @@ def process_dataset(dataset_name, target="", mode="train_val_test", RS=42, hct=1
         elif mode == "cv":
             str_num = f"_{num}"
 
-        # Pargent Pipeline
         ### Imputation 1
         # Recode categorical column missings as NA
         if len(cat_cols + z_cols) > 0:
