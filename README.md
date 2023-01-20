@@ -8,3 +8,17 @@ To reproduce the results reported in the paper, one must:
   - xAPI-Edu-Data (Amrieh et al. 2016): Download excel file from https://www.kaggle.com/datasets/aljarah/xAPI-Edu-Data and place it in data/raw/xAPI-Edu-Data
   - OULAD (Kuzilek et al. 2017): Download files from https://www.kaggle.com/datasets/anlgrbz/student-demographics-online-education-dataoulad and place them in data/raw/OULAD
 2. Run notebooks
+
+Package requirements:
+- numpy
+- pandas
+- category_encoders
+- sklearn
+- gpboost
+- tensorflow
+- tensorflow_addons
+- hyperopt
+- xgboost
+- liac-arff
+- pickle
+- scipy
